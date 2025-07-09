@@ -14,10 +14,10 @@ app.use(express.json());
 // Frontend estático
 app.use(express.static(path.join(__dirname, '../contac_form-back-frony/public')));
 
-// Rutas
+// Rutas de autenticación
 app.use('/api/auth', authRoutes);
 
-// Home
+// Ruta raíz
 app.get('/', (req, res) => {
   res.send('API CRM operativa 🚀');
 });
@@ -58,12 +58,22 @@ app.get('/api/contact', async (req, res) => {
   }
 });
 
-// PUT /api/contact/:id - Actualizar un mensaje
+// PUT /api/contact/:id - Actualizar mensaje o solo el estado
 app.put('/api/contact/:id', async (req, res) => {
   const { id } = req.params;
   const { name, email, phone, message, status } = req.body;
 
   try {
+    // Si solo se envía status (ej: desde dashboard.js)
+    if (!name && !email && !phone && !message && status) {
+      const [result] = await pool.execute(
+        `UPDATE messages SET status = ? WHERE id = ?`,
+        [status, id]
+      );
+      return res.status(200).json({ message: 'Estado actualizado correctamente' });
+    }
+
+    // Actualización completa (ej: desde admin)
     const [result] = await pool.execute(
       `UPDATE messages SET 
         name = IF(? != '', ?, name),
@@ -73,10 +83,10 @@ app.put('/api/contact/:id', async (req, res) => {
         status = ?
        WHERE id = ?`,
       [
-        name, name,
-        email, email,
-        phone, phone,
-        message, message,
+        name || '', name,
+        email || '', email,
+        phone || '', phone,
+        message || '', message,
         status || 'nuevo',
         id
       ]
